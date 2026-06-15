@@ -1,0 +1,6 @@
+{
+  "name": "FitGym Membership App",
+  "description": "Ứng dụng cổng hội viên FitGym với các tính năng đăng nhập, Kích hoạt OTP, chatbot PT AI, bảng giá gói tập và cổng hỗ trợ trực tuyến.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
