@@ -33,7 +33,7 @@ import {
   HelpCircle,
   FileText
 } from "lucide-react";
-import { UserSession, AppScreen, Message, GymPackage, SupportContact } from "./types";
+import { UserSession, AppScreen, Message, GymPackage, SupportContact, AppNotification } from "./types";
 import { GYM_PACKAGES, SUPPORT_CONTACTS } from "./data";
 
 export default function App() {
@@ -42,21 +42,156 @@ export default function App() {
   const [language, setLanguage] = useState<"VI" | "EN">("VI");
   
   // App navigation & status
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>("LOGIN");
-  const [lastScreen, setLastScreen] = useState<AppScreen>("LOGIN"); // for back buttons
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
+    try {
+      const saved = localStorage.getItem("fitgym_session");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.isLoggedIn) {
+          return "HOME";
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to parse initial screen status", e);
+    }
+    return "LOGIN";
+  });
+  const [lastScreen, setLastScreen] = useState<AppScreen>(() => {
+    try {
+      const saved = localStorage.getItem("fitgym_session");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.isLoggedIn) {
+          return "HOME";
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to parse initial last screen", e);
+    }
+    return "LOGIN";
+  }); // for back buttons
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
   // Dynamic user session persistence
-  const [session, setSession] = useState<UserSession>({
-    fullName: "NAM",
-    phoneNumber: "0012312312",
-    password: "",
-    memberCode: "#0013",
-    memberClass: "Hội viên CLASS_PLATINUM",
-    isRegistered: false,
-    isLoggedIn: false,
-    workoutsCount: 0,
+  const [session, setSession] = useState<UserSession>(() => {
+    try {
+      const saved = localStorage.getItem("fitgym_session");
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn("Failed to parse fitgym_session", e);
+    }
+    return {
+      fullName: "NAM",
+      phoneNumber: "0012312312",
+      password: "",
+      memberCode: "#0013",
+      memberClass: "Hội viên CLASS_PLATINUM",
+      isRegistered: false,
+      isLoggedIn: false,
+      workoutsCount: 0,
+    };
   });
+
+  // Keep list of registered users to allow logging back into any registered account
+  const [registeredUsers, setRegisteredUsers] = useState<Record<string, { fullName: string; password?: string }>>(() => {
+    try {
+      const saved = localStorage.getItem("fitgym_registered_users");
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn("Failed to load registered users", e);
+    }
+    return {
+      "0012312312": { fullName: "NAM", password: "123456" }
+    };
+  });
+
+  // Persist session changes
+  useEffect(() => {
+    try {
+      localStorage.setItem("fitgym_session", JSON.stringify(session));
+    } catch (e) {
+      console.warn("Failed to save session", e);
+    }
+  }, [session]);
+
+  // Persist registered users
+  useEffect(() => {
+    try {
+      localStorage.setItem("fitgym_registered_users", JSON.stringify(registeredUsers));
+    } catch (e) {
+      console.warn("Failed to save registered users", e);
+    }
+  }, [registeredUsers]);
+
+  // Dynamic App Notifications state
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    try {
+      const saved = localStorage.getItem("fitgym_notifications");
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn("Failed to load notifications", e);
+    }
+    return [
+      {
+        id: "msg-tiep_tan-init",
+        title: "Tin nhắn từ Tiếp Tân Vy Vy",
+        body: "Chào bạn! Mình là Vy Vy, phục vụ trực tổng đài lễ tân FIT GYM. Rất vui được kết nối hỗ trợ bạn!",
+        time: "Vừa xong",
+        isRead: false,
+        type: "message",
+      },
+      {
+        id: "msg-huan_luyen-init",
+        title: "Tin nhắn từ PT Nam Khanh",
+        body: "Hello, mình là PT Nam Khanh. Mình sẽ tư vấn chi tiết về giáo án tập luyện và ăn kiêng nhé!",
+        time: "5 phút trước",
+        isRead: false,
+        type: "message",
+      },
+      {
+        id: "1",
+        title: "Chào mừng hội viên mới!",
+        body: "Cảm ơn bạn đã lựa chọn FIT GYM. Hãy trải nghiệm tập luyện hoặc tham khảo các gói tập cực hot nhé!",
+        time: "10 phút trước",
+        isRead: false,
+        type: "welcome",
+      },
+      {
+        id: "2",
+        title: "Mã QR Check-in đã sẵn sàng",
+        body: "Thẻ số hội viên ảo đã được kích hoạt. Bạn có thể sử dụng mã QR tại Trang chủ để quét qua cổng tự động.",
+        time: "1 giờ trước",
+        isRead: false,
+        type: "auth",
+      },
+      {
+        id: "3",
+        title: "Quà tặng 20% gói Combo PT 1-1",
+        body: "Ưu đãi đặc quyền giảm 20% khi đăng ký PT kèm đo chỉ số InBody miễn phí. Nhắn tin hỗ trợ ở tab Chat để đăng ký.",
+        time: "1 ngày trước",
+        isRead: true,
+        type: "promo",
+      }
+    ];
+  });
+
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notificationTab, setNotificationTab] = useState<"notif" | "message">("notif");
+
+  // Persist notifications change
+  useEffect(() => {
+    try {
+      localStorage.setItem("fitgym_notifications", JSON.stringify(notifications));
+    } catch (e) {
+      console.warn("Failed to save notifications", e);
+    }
+  }, [notifications]);
 
   // Selected subscription package status
   const [activePackage, setActivePackage] = useState<GymPackage | null>(null);
@@ -93,6 +228,7 @@ export default function App() {
   const [activeSupportContact, setActiveSupportContact] = useState<SupportContact>(SUPPORT_CONTACTS[0]);
   const [supportCategoryFilter, setSupportCategoryFilter] = useState<"all" | "pt" | "support">("all");
   const [supportSearchQuery, setSupportSearchQuery] = useState("");
+  const [supportActiveSubTab, setSupportActiveSubTab] = useState<"directory" | "incoming">("directory");
   
   // Message history map for support agents
   const [supportAgentChats, setSupportAgentChats] = useState<Record<string, Message[]>>({
@@ -127,6 +263,29 @@ export default function App() {
   // UI state for showing custom active modal actions the simulator performs
   const [checkoutModalPackage, setCheckoutModalPackage] = useState<GymPackage | null>(null);
   const [toastMessage, setToastMessage] = useState("");
+
+  // Flat list of all incoming messages from staff/support
+  const incomingMessages = Object.entries(supportAgentChats).flatMap(([agentId, messages]) => {
+    const contact = SUPPORT_CONTACTS.find((c) => c.id === agentId);
+    if (!contact) return [];
+    
+    return (messages as Message[])
+      .filter((msg) => msg.role === "assistant")
+      .map((msg) => ({
+        ...msg,
+        agent: contact,
+      }));
+  });
+
+  const getMessageTimeFactor = (id: string) => {
+    if (id.startsWith("reply-")) return parseInt(id.replace("reply-", ""), 10) || 0;
+    if (id.startsWith("user-support-")) return parseInt(id.replace("user-support-", ""), 10) || 0;
+    return 1; // Initial messages
+  };
+
+  const sortedIncomingMessages = [...incomingMessages].sort((a, b) => {
+    return getMessageTimeFactor(b.id) - getMessageTimeFactor(a.id);
+  });
 
   // Refs for auto scroll in chats
   const aiChatEndRef = useRef<HTMLDivElement>(null);
@@ -220,6 +379,21 @@ export default function App() {
         ...prev,
         [agentId]: [...(prev[agentId] || []), agentReply],
       }));
+      
+      // Auto-trigger a system notification for the incoming message
+      const agentObj = SUPPORT_CONTACTS.find((c) => c.id === agentId);
+      const agentName = agentObj ? agentObj.name : (language === "VI" ? "Nhân viên hỗ trợ" : "Support Staff");
+      
+      const newMsgNotif: AppNotification = {
+        id: `msg-${agentId}-${Date.now()}`,
+        title: language === "VI" ? `Tin nhắn mới từ ${agentName}` : `New message from ${agentName}`,
+        body: replyText,
+        time: language === "VI" ? "Vừa xong" : "Just now",
+        isRead: false,
+        type: "message"
+      };
+      setNotifications((prev) => [newMsgNotif, ...prev]);
+
       setSupportReplyPending(false);
     }, 1500);
   };
@@ -236,21 +410,49 @@ export default function App() {
       return;
     }
 
-    // Accept any valid credentials or local registers
-    if (
-      (loginPhone === "0012312312" && loginPass === "123456") ||
-      (session.isRegistered && loginPhone === session.phoneNumber && loginPass === session.password) ||
-      loginPhone === "demo" ||
-      loginPhone.length >= 4
-    ) {
+    // Check if the number is registered in our local mock database
+    const registeredUser = registeredUsers[loginPhone];
+
+    if (registeredUser) {
+      // Must check correct password for registered accounts
+      if (registeredUser.password === loginPass) {
+        setSession((prev) => ({
+          ...prev,
+          phoneNumber: loginPhone,
+          fullName: registeredUser.fullName,
+          password: registeredUser.password,
+          isRegistered: true,
+          isLoggedIn: true,
+        }));
+        setCurrentScreen("HOME");
+        showToast(language === "VI" ? "Đăng nhập thành công!" : "Login successfully!");
+      } else {
+        showToast(
+          language === "VI"
+            ? "Mật khẩu cho tài khoản này chưa chính xác!"
+            : "Incorrect password for this account!"
+        );
+      }
+    } else if (loginPhone === "demo") {
       setSession((prev) => ({
         ...prev,
-        phoneNumber: loginPhone === "demo" ? "0012312312" : loginPhone,
-        fullName: loginPhone === "demo" ? "KHÁCH QUEN" : prev.fullName,
+        phoneNumber: "0012312312",
+        fullName: "KHÁCH QUEN",
+        isRegistered: true,
         isLoggedIn: true,
       }));
       setCurrentScreen("HOME");
-      showToast(language === "VI" ? "Đăng nhập thành công!" : "Login successfully!");
+      showToast(language === "VI" ? "Đăng nhập thành công với tài khoản Demo!" : "Demo login successfully!");
+    } else if (loginPhone.length >= 4) {
+      // General bypass/guest flow for other numbers
+      setSession((prev) => ({
+        ...prev,
+        phoneNumber: loginPhone,
+        fullName: "KHÁCH VÃNG LAI",
+        isLoggedIn: true,
+      }));
+      setCurrentScreen("HOME");
+      showToast(language === "VI" ? "Đăng nhập thành công (Khách vãng lai)!" : "Logged in successfully as Guest!");
     } else {
       showToast(
         language === "VI"
@@ -324,7 +526,7 @@ export default function App() {
       return;
     }
     if (regPass !== regConfirmPass) {
-      showToast(language === "VI" ? "Mật khẩu xách nhận không khớp!" : "Confirm password doesn't match!");
+      showToast(language === "VI" ? "Mật khẩu xác nhận không khớp!" : "Confirm password doesn't match!");
       return;
     }
 
@@ -336,6 +538,25 @@ export default function App() {
       isLoggedIn: true,
     }));
 
+    // Save to registeredUsers list
+    setRegisteredUsers((prev) => ({
+      ...prev,
+      [regPhone]: { fullName: regName.toUpperCase(), password: regPass }
+    }));
+
+    // Add specific custom notification for newly registered member
+    const newWelcomeNotif: AppNotification = {
+      id: Date.now().toString(),
+      title: language === "VI" ? `Chào mừng ${regName.toUpperCase()}!` : `Welcome ${regName.toUpperCase()}!`,
+      body: language === "VI"
+        ? `Tài khoản với SĐT ${regPhone} đã đăng ký thành công. Chúc bạn có những giờ phút tập luyện hứng khởi tại FIT GYM!`
+        : `Your account with phone number ${regPhone} is active. Enjoy your workouts at FIT GYM!`,
+      time: language === "VI" ? "Vừa xong" : "Just now",
+      isRead: false,
+      type: "welcome"
+    };
+    setNotifications((prev) => [newWelcomeNotif, ...prev]);
+
     setCurrentScreen("HOME");
     showToast(language === "VI" ? "Thiết lập mật khẩu thành công! Chào mừng hội viên mới!" : "Password set successfully! Welcome!");
   };
@@ -344,10 +565,54 @@ export default function App() {
   const handleLogoutAction = () => {
     setSession((prev) => ({ ...prev, isLoggedIn: false }));
     setIsDropdownOpen(false);
+    setIsNotificationsOpen(false);
     setCurrentScreen("LOGIN");
     setLoginPhone("");
     setLoginPass("");
     showToast(language === "VI" ? "Đã đăng xuất tài khoản!" : "Sign out successfully!");
+  };
+
+  // Notification action handlers
+  const markNotificationAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    showToast(language === "VI" ? "Đã đọc tất cả thông báo!" : "Marked all as read!");
+  };
+
+  const deleteNotification = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+    showToast(language === "VI" ? "Đã xóa toàn bộ thông báo!" : "Cleared all notifications!");
+  };
+
+  const handleNotificationClick = (n: AppNotification) => {
+    markNotificationAsRead(n.id);
+    if (n.type === "message") {
+      const parts = n.id.split("-");
+      if (parts.length >= 3) {
+        const agentId = parts[1];
+        const contactObj = SUPPORT_CONTACTS.find((c) => c.id === agentId);
+        if (contactObj) {
+          setActiveSupportContact(contactObj);
+          setCurrentScreen("SUPPORT_CHAT");
+          setIsNotificationsOpen(false);
+          return;
+        }
+      }
+      // Fallback to Support incoming messages list
+      setCurrentScreen("SUPPORT_LIST");
+      setSupportActiveSubTab("incoming");
+      setIsNotificationsOpen(false);
+    }
   };
 
   // API Call to chatbot endpoint
@@ -446,10 +711,26 @@ export default function App() {
           ? `Mô phỏng: Đã kích hoạt ${checkoutModalPackage.name}!`
           : `Simulated: Activated ${checkoutModalPackage.name}!`
       );
+      
+      // Add a notification for package subscription
+      const newNotif: AppNotification = {
+        id: Date.now().toString(),
+        title: language === "VI" ? "Kích hoạt gói tập mới!" : "New package activated!",
+        body: language === "VI"
+          ? `Bạn đã thanh toán thành công gói ${checkoutModalPackage.name}. Mã QR Check-in ở Trang Chủ đã sẵn sàng mở khóa!`
+          : `You have successfully purchased ${checkoutModalPackage.name}. Your Check-in QR code is ready on Home screen!`,
+        time: language === "VI" ? "Vừa xong" : "Just now",
+        isRead: false,
+        type: "billing"
+      };
+      setNotifications((prev) => [newNotif, ...prev]);
+
       // Automatically navigate home
       setCurrentScreen("HOME");
     }
   };
+
+  const isLoggedScreen = session.isLoggedIn && !["LOGIN", "REGISTER_STEP_1", "REGISTER_STEP_2", "REGISTER_STEP_3"].includes(currentScreen);
 
   return (
     <div className="min-h-screen bg-[#3C4A50] text-slate-200 font-sans overflow-x-hidden relative selection:bg-[#D2FF00] selection:text-black">
@@ -491,6 +772,301 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* APP BAR TOP NAVIGATION (For logged-in view only) - Positioned statically under status bar, outside of the scrollable container */}
+                {isLoggedScreen && (
+                  <div id="phone-inner-header" className="h-[55px] shrink-0 bg-black/90 backdrop-blur-md flex items-center justify-between px-5 z-[45] pt-1 border-b border-zinc-900/90 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+                    
+                    {/* Left logo bar */}
+                    <div className="flex items-center gap-1.5">
+                      <Dumbbell className="text-[#D2FF00] size-4 rotate-45" />
+                      <span className="font-display italic text-lg tracking-wider text-white font-extrabold select-none">
+                        FIT<span className="text-[#D2FF00]">.GYM APP</span>
+                      </span>
+                    </div>
+
+                    {/* Right settings/bell & user avatar drop toggler */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <button
+                          onClick={() => {
+                            setIsNotificationsOpen(!isNotificationsOpen);
+                            setIsDropdownOpen(false);
+                          }}
+                          className="p-1 -m-1 focus:outline-none focus:ring-0 cursor-pointer text-zinc-400 hover:text-white relative bg-transparent border-0 transition"
+                        >
+                          <Bell className="size-4" />
+                          {notifications.filter(n => !n.isRead).length > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-[#D2FF00] text-black text-[7.5px] font-black rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-[0_0_6px_rgba(210,255,0,0.6)] z-10">
+                              {notifications.filter(n => !n.isRead).length}
+                            </span>
+                          )}
+                        </button>
+
+                      </div>
+
+                      {/* Avatar Button */}
+                      <div className="relative">
+                        <button
+                           id="avatar-button"
+                           onClick={() => {
+                             setIsDropdownOpen(!isDropdownOpen);
+                             setIsNotificationsOpen(false);
+                           }}
+                           className="w-7 h-7 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[#D2FF00] font-bold text-xs flex items-center justify-center duration-150 cursor-pointer shadow-[0_0_8px_rgba(210,255,0,0.1)]"
+                        >
+                          {session.fullName ? session.fullName[0] : "N"}
+                        </button>
+
+                        {/* Profile dropdown matches image 10 precisely */}
+                        {isDropdownOpen && (
+                          <div className="absolute right-0 top-9 w-[190px] bg-slate-900/95 border border-slate-800 rounded-2xl shadow-2xl z-[900] p-1.5 backdrop-blur-lg animate-fade-in">
+                            
+                            {/* Header profile title */}
+                            <div className="p-2 border-b border-slate-800/60 mb-1">
+                              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest leading-none">Hội viên PLATINUM</p>
+                              <p className="text-xs text-white uppercase font-bold truncate mt-1">{session.fullName || "NAM"}</p>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                setIsDropdownOpen(false);
+                                showToast(language === "VI" ? "Xem Hồ sơ cá nhân" : "Viewing Profile");
+                              }}
+                              className="w-full text-left p-2 hover:bg-slate-800/80 rounded-xl text-slate-350 hover:text-white text-[11px] flex items-center gap-2 duration-150 cursor-pointer"
+                            >
+                              <User className="size-3.5 text-slate-450" />
+                              <span>{language === "VI" ? "Hồ sơ cá nhân" : "Personal profile"}</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setIsDropdownOpen(false);
+                                showToast(language === "VI" ? "Lịch sử thanh toán trống" : "Payment history empty");
+                              }}
+                              className="w-full text-left p-2 hover:bg-slate-800/80 rounded-xl text-slate-350 hover:text-white text-[11px] flex items-center gap-2 duration-150 cursor-pointer"
+                            >
+                              <CreditCard className="size-3.5 text-slate-450" />
+                              <span>{language === "VI" ? "Lịch sử thanh toán" : "Payment history"}</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setIsDropdownOpen(false);
+                                showToast(language === "VI" ? "Cửa sổ Cài đặt bảo mật" : "Security Settings");
+                              }}
+                              className="w-full text-left p-2 hover:bg-slate-800/80 rounded-xl text-slate-350 hover:text-white text-[11px] flex items-center gap-2 duration-150 cursor-pointer"
+                            >
+                              <Shield className="size-3.5 text-slate-450" />
+                              <span>{language === "VI" ? "Cài đặt bảo mật" : "Security settings"}</span>
+                            </button>
+
+                            <hr className="border-slate-800/50 my-1" />
+
+                            <button
+                              onClick={handleLogoutAction}
+                              className="w-full text-left p-2 hover:bg-red-950/40 rounded-xl text-red-500 hover:text-red-400 text-[11px] flex items-center gap-2 duration-150 cursor-pointer"
+                            >
+                              <LogOut className="size-3.5" />
+                              <span>{language === "VI" ? "Đăng xuất cổng" : "Sign out"}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Notifications dropdown list - Pinned globally to the chassis screen (doesn't scroll/float when cuộn lên) */}
+                {isLoggedScreen && isNotificationsOpen && (
+                  <div className="absolute left-3.5 right-3.5 top-[99px] bg-slate-900/98 border border-slate-800 rounded-3xl shadow-[0_15px_45px_0_rgba(0,0,0,0.9)] z-[150] p-3.5 backdrop-blur-xl animate-fade-in flex flex-col gap-3 text-left">
+                    {/* Header title */}
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/60 shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <Bell className="size-3.5 text-[#D2FF00]" />
+                        <span className="text-[11px] font-bold text-white uppercase tracking-wider">
+                          {language === "VI" ? "THÔNG BÁO & TIN NHẮN" : "NOTIFICATIONS & CHAT"}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        {notificationTab === "notif" && notifications.some(n => n.type !== "message" && !n.isRead) && (
+                          <button
+                            onClick={markAllNotificationsAsRead}
+                            type="button"
+                            className="text-[9px] text-[#D2FF00] hover:underline font-medium cursor-pointer bg-transparent border-0"
+                          >
+                            {language === "VI" ? "Đọc tất cả" : "Read all"}
+                          </button>
+                        )}
+                        {notificationTab === "message" && notifications.some(n => n.type === "message" && !n.isRead) && (
+                          <button
+                            onClick={() => {
+                              notifications.filter(n => n.type === "message").forEach(n => markNotificationAsRead(n.id));
+                              showToast(language === "VI" ? "Đã đọc tất cả tin nhắn" : "Marked all messages as read");
+                            }}
+                            type="button"
+                            className="text-[9px] text-[#D2FF00] hover:underline font-medium cursor-pointer bg-transparent border-0"
+                          >
+                            {language === "VI" ? "Đọc tất cả" : "Read all"}
+                          </button>
+                        )}
+                        {notifications.length > 0 && (
+                          <button
+                            onClick={clearAllNotifications}
+                            type="button"
+                            className="text-[9px] text-zinc-500 hover:text-rose-450 hover:underline font-medium cursor-pointer bg-transparent border-0"
+                          >
+                            {language === "VI" ? "Xóa hết" : "Clear all"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Integrated Tab switcher inside notifications */}
+                    <div className="flex bg-zinc-950 p-[3px] rounded-xl border border-zinc-900/80 shrink-0 select-none">
+                      <button
+                        onClick={() => setNotificationTab("notif")}
+                        type="button"
+                        className={`flex-1 py-1.5 rounded-lg font-mono text-[9px] font-black tracking-wider uppercase flex items-center justify-center gap-1.5 transition cursor-pointer border-0 ${
+                          notificationTab === "notif" ? "bg-[#D2FF00] text-black" : "text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        <Bell className="size-3" />
+                        <span>{language === "VI" ? "Thông báo chung" : "System Notifs"}</span>
+                        {notifications.filter(n => n.type !== "message" && !n.isRead).length > 0 && (
+                          <span className={`px-1 rounded text-[7.5px] font-sans font-extrabold ${notificationTab === "notif" ? "bg-black text-white" : "bg-[#D2FF00] text-black animate-pulse"}`}>
+                            {notifications.filter(n => n.type !== "message" && !n.isRead).length}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setNotificationTab("message")}
+                        type="button"
+                        className={`flex-1 py-1.5 rounded-lg font-mono text-[9px] font-black tracking-wider uppercase flex items-center justify-center gap-1.5 transition cursor-pointer border-0 ${
+                          notificationTab === "message" ? "bg-[#D2FF00] text-black" : "text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        <MessageSquare className="size-3" />
+                        <span>{language === "VI" ? "Tin nhắn đến" : "Support Inbox"}</span>
+                        {notifications.filter(n => n.type === "message" && !n.isRead).length > 0 && (
+                          <span className={`px-1 rounded text-[7.5px] font-sans font-extrabold ${notificationTab === "message" ? "bg-black text-white" : "bg-[#D2FF00] text-black animate-pulse"}`}>
+                            {notifications.filter(n => n.type === "message" && !n.isRead).length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Notifications / Messages list display area */}
+                    <div className="max-h-[220px] overflow-y-auto flex flex-col gap-2 pr-0.5 custom-scrollbar">
+                      {notificationTab === "notif" && (
+                        notifications.filter(n => n.type !== "message").length === 0 ? (
+                          <div className="text-center py-8 text-zinc-500 text-[10px] font-sans">
+                            {language === "VI" ? "Không có thông báo hệ thống nào" : "No system notifications"}
+                          </div>
+                        ) : (
+                          notifications.filter(n => n.type !== "message").map((n) => (
+                            <div
+                              key={n.id}
+                              onClick={() => handleNotificationClick(n)}
+                              className={`p-2 rounded-xl border transition-all duration-150 relative cursor-pointer group text-left ${
+                                n.isRead
+                                  ? "bg-slate-950/40 border-slate-905/60 hover:bg-slate-900/50"
+                                  : "bg-gradient-to-br from-slate-900 to-slate-850 border-zinc-800/80 shadow-sm"
+                              }`}
+                            >
+                              {!n.isRead && (
+                                <span className="absolute top-2.5 right-2 w-1.5 h-1.5 rounded-full bg-[#D2FF00] shadow-[0_0_5px_rgba(210,255,0,0.8)]" />
+                              )}
+                              <button
+                                onClick={(e) => deleteNotification(n.id, e)}
+                                className="absolute bottom-2 right-2 p-1 text-zinc-650 hover:text-white rounded-lg duration-105 opacity-0 group-hover:opacity-100 bg-zinc-950/60 border border-zinc-800 cursor-pointer"
+                                title={language === "VI" ? "Xóa thông báo" : "Delete notification"}
+                              >
+                                <X className="size-2.5" />
+                              </button>
+
+                              <div className="flex gap-2 items-start pr-4">
+                                <div className="mt-0.5 shrink-0 w-5 h-5 rounded-lg bg-zinc-950 flex items-center justify-center border border-zinc-900">
+                                  {n.type === "welcome" && <Sparkles className="size-3 text-[#D2FF00]" />}
+                                  {n.type === "auth" && <Shield className="size-3 text-sky-450" />}
+                                  {n.type === "promo" && <Info className="size-3 text-amber-450" />}
+                                  {n.type === "workout" && <Dumbbell className="size-3 text-[#D2FF00]" />}
+                                  {n.type === "billing" && <CreditCard className="size-3 text-emerald-450" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-[10px] truncate leading-tight ${n.isRead ? "text-zinc-400 font-medium" : "text-white font-bold"}`}>
+                                    {n.title}
+                                  </p>
+                                  <p className="text-[9px] text-zinc-500 line-clamp-2 mt-0.5 leading-normal">
+                                    {n.body}
+                                  </p>
+                                  <p className="text-[8px] text-zinc-600 font-mono mt-1">
+                                    {n.time}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )
+                      )}
+
+                      {notificationTab === "message" && (
+                        notifications.filter(n => n.type === "message").length === 0 ? (
+                          <div className="text-center py-8 text-zinc-500 text-[10px] font-sans">
+                            {language === "VI" ? "Không có tin nhắn mới nào" : "No new support messages"}
+                          </div>
+                        ) : (
+                          notifications.filter(n => n.type === "message").map((n) => (
+                            <div
+                              key={n.id}
+                              onClick={() => handleNotificationClick(n)}
+                              className={`p-2.5 rounded-xl border transition-all duration-150 relative cursor-pointer group text-left ${
+                                n.isRead
+                                  ? "bg-slate-950/40 border-slate-905/60 hover:bg-slate-900/50"
+                                  : "bg-gradient-to-br from-slate-900 to-slate-850 border-[#D2FF00]/15 shadow-sm hover:border-[#D2FF00]/30"
+                              }`}
+                            >
+                              {!n.isRead && (
+                                <span className="absolute top-3.5 right-2 w-1.5 h-1.5 rounded-full bg-[#D2FF00] shadow-[0_0_5px_rgba(210,255,0,0.8)]" />
+                              )}
+                              <button
+                                onClick={(e) => deleteNotification(n.id, e)}
+                                className="absolute bottom-2 right-2 p-1 text-zinc-650 hover:text-white rounded-lg duration-105 opacity-0 group-hover:opacity-100 bg-zinc-950/60 border border-zinc-800 cursor-pointer"
+                                title={language === "VI" ? "Xóa" : "Delete"}
+                              >
+                                <X className="size-2.5" />
+                              </button>
+                              <div className="flex gap-2.5 items-start pr-4">
+                                <div className="mt-0.5 shrink-0 w-6 h-6 rounded-full bg-zinc-950 flex items-center justify-center border border-zinc-800 overflow-hidden relative">
+                                  <MessageSquare className="size-3 text-[#D2FF00]" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className={`text-[10px] truncate leading-tight ${n.isRead ? "text-zinc-400 font-medium" : "text-white font-black"}`}>
+                                      {n.title}
+                                    </p>
+                                    <span className="text-[7px] text-[#D2FF00] border border-[#D2FF00]/20 bg-[#D2FF00]/5 px-1 rounded uppercase font-black tracking-widest shrink-0">HỖ TRỢ</span>
+                                  </div>
+                                  <p className="text-[9.5px] text-zinc-300 line-clamp-2 mt-1 leading-normal italic">
+                                    "{n.body}"
+                                  </p>
+                                  <div className="flex items-center justify-between mt-2 pt-1 border-t border-zinc-900/40">
+                                    <span className="text-[8px] text-zinc-600 font-mono">
+                                      {n.time}
+                                    </span>
+                                    <span className="text-[8.5px] text-[#D2FF00] group-hover:underline font-mono font-black tracking-wide uppercase flex items-center gap-0.5">
+                                      {language === "VI" ? "TRẢ LỜI NGAY" : "REPLY NOW"} →
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Simulated Toast floating bubble inside phone screen */}
                 {toastMessage && (
                   <div className="absolute top-[60px] left-1/2 -translate-x-1/2 w-[85%] bg-[#0f1115] border border-[#D2FF00]/30 rounded-xl p-2 px-3 shadow-lg z-[999] flex items-center gap-2 animate-fade-in">
@@ -529,94 +1105,6 @@ export default function App() {
 
                 {/* 2. Main Phone Body Viewer Screens */}
                 <div className="flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col relative bg-slate-950 pb-5">
-                  
-                  {/* APP BAR TOP NAVIGATION (For logged-in view only) */}
-                  {session.isLoggedIn && (
-                    <div id="phone-inner-header" className="sticky top-0 h-[55px] shrink-0 bg-black/90 backdrop-blur-md flex items-center justify-between px-5 z-[45] pt-1 border-b border-zinc-900/90 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
-                      
-                      {/* Left logo bar */}
-                      <div className="flex items-center gap-1.5">
-                        <Dumbbell className="text-[#D2FF00] size-4 rotate-45" />
-                        <span className="font-display italic text-lg tracking-wider text-white font-extrabold select-none">
-                          FIT<span className="text-[#D2FF00]">.GYM APP</span>
-                        </span>
-                      </div>
-
-                      {/* Right settings/bell & user avatar drop toggler */}
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <Bell className="text-zinc-400 hover:text-white size-4 cursor-pointer transition" />
-                          <span className="absolute -top-1 -right-1.5 bg-[#D2FF00] text-black text-[8.5px] font-black rounded-full w-3.5 h-3.5 flex items-center justify-center shadow-[0_0_6px_rgba(210,255,0,0.4)]">2</span>
-                        </div>
-                        
-                        {/* Avatar Button */}
-                        <div className="relative">
-                          <button
-                             id="avatar-button"
-                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                             className="w-7 h-7 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[#D2FF00] font-bold text-xs flex items-center justify-center duration-150 cursor-pointer shadow-[0_0_8px_rgba(210,255,0,0.1)]"
-                          >
-                            {session.fullName ? session.fullName[0] : "N"}
-                          </button>
-
-                          {/* Profile dropdown matches image 10 precisely */}
-                          {isDropdownOpen && (
-                            <div className="absolute right-0 top-9 w-[190px] bg-slate-900/95 border border-slate-800 rounded-2xl shadow-2xl z-[900] p-1.5 backdrop-blur-lg animate-fade-in">
-                              
-                              {/* Header profile title */}
-                              <div className="p-2 border-b border-slate-800/60 mb-1">
-                                <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest leading-none">Hội viên PLATINUM</p>
-                                <p className="text-xs text-white uppercase font-bold truncate mt-1">{session.fullName || "NAM"}</p>
-                              </div>
-
-                              <button
-                                onClick={() => {
-                                  setIsDropdownOpen(false);
-                                  showToast(language === "VI" ? "Xem Hồ sơ cá nhân" : "Viewing Profile");
-                                }}
-                                className="w-full text-left p-2 hover:bg-slate-800/80 rounded-xl text-slate-350 hover:text-white text-[11px] flex items-center gap-2 duration-150 cursor-pointer"
-                              >
-                                <User className="size-3.5 text-slate-450" />
-                                <span>{language === "VI" ? "Hồ sơ cá nhân" : "Personal profile"}</span>
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setIsDropdownOpen(false);
-                                  showToast(language === "VI" ? "Lịch sử thanh toán trống" : "Payment history empty");
-                                }}
-                                className="w-full text-left p-2 hover:bg-slate-800/80 rounded-xl text-slate-350 hover:text-white text-[11px] flex items-center gap-2 duration-150 cursor-pointer"
-                              >
-                                <CreditCard className="size-3.5 text-slate-450" />
-                                <span>{language === "VI" ? "Lịch sử thanh toán" : "Payment history"}</span>
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setIsDropdownOpen(false);
-                                  showToast(language === "VI" ? "Cửa sổ Cài đặt bảo mật" : "Security Settings");
-                                }}
-                                className="w-full text-left p-2 hover:bg-slate-800/80 rounded-xl text-slate-350 hover:text-white text-[11px] flex items-center gap-2 duration-150 cursor-pointer"
-                              >
-                                <Shield className="size-3.5 text-slate-450" />
-                                <span>{language === "VI" ? "Cài đặt bảo mật" : "Security settings"}</span>
-                              </button>
-
-                              <hr className="border-slate-800/50 my-1" />
-
-                              <button
-                                onClick={handleLogoutAction}
-                                className="w-full text-left p-2 hover:bg-red-950/40 rounded-xl text-red-500 hover:text-red-400 text-[11px] flex items-center gap-2 duration-150 cursor-pointer"
-                              >
-                                <LogOut className="size-3.5" />
-                                <span>{language === "VI" ? "Đăng xuất cổng" : "Sign out"}</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   {/* ---------------- SCREEN 1: LOGIN ---------------- */}
                   {currentScreen === "LOGIN" && (
@@ -1452,7 +1940,7 @@ export default function App() {
 
                       {/* AI Quick helper tags */}
                       <div className="my-2 py-2 border-t border-b border-zinc-900/40 flex items-center gap-2 overflow-x-auto select-none no-scrollbar shrink-0">
-                        <span className="text-[7px] text-zinc-500 font-mono shrink-0 uppercase">GỢI Ý NHANH:</span>
+                        <span className="text-[7px] text-zinc-550 font-mono shrink-0 uppercase">GỢI Ý NHANH:</span>
                         {[
                           { text: "LỊCH TẬP NGỰC TĂNG CƠ", msg: "Lên dùm tôi lịch tập ngực tăng cơ độ dày tốt nhất" },
                           { text: "THỰC ĐƠN GIẢM MỠ BỤNG", msg: "Cho tôi thực đơn ăn uống giảm mỡ bụng trong vòng 1 tuần" },
@@ -1478,7 +1966,7 @@ export default function App() {
                           value={aiInputMessage}
                           onChange={(e) => setAiInputMessage(e.target.value)}
                           placeholder="Hỏi AI về bài tập, chế độ dinh dưỡng..."
-                          className="flex-1 bg-zinc-900 border border-zinc-800 focus:outline-none focus:border-[#D2FF00] text-xs text-white placeholder-zinc-500 py-3.5 pl-4 pr-3 rounded-xl font-mono"
+                          className="flex-1 bg-zinc-900 border border-zinc-800 focus:outline-none focus:border-[#D2FF00] text-xs text-white placeholder-zinc-550 py-3.5 pl-4 pr-3 rounded-xl font-mono"
                         />
                         <button
                           type="submit"
@@ -1494,157 +1982,260 @@ export default function App() {
 
                   {/* ---------------- SCREEN 8: CHAT SUPPORT TEAM LIST (HỖ TRỢ CHAT) ---------------- */}
                   {currentScreen === "SUPPORT_LIST" && (
-                    <div className="flex-1 flex flex-col px-5 pt-3 h-full animate-fade-in text-left">
+                    <div className="flex-1 flex flex-col px-5 pt-0 h-full animate-fade-in text-left">
                       
-                      {/* Search & filters head */}
-                      <div className="mb-4">
-                        <span className="text-[10px] font-mono tracking-widest text-[#D2FF00] uppercase font-bold leading-none">
-                          TỔNG ĐÀI HỖ TRỢ TRỰC TUYẾN 24/7
-                        </span>
-                        <h3 className="font-display italic text-2xl font-extrabold text-white uppercase leading-none mt-1 tracking-wider">
-                          MESSENGER HỖ TRỢ CHAT
-                        </h3>
-                      </div>
+                      {/* Sticky Header block for SUPPORT_LIST - keeps header fixed when scrolling list items */}
+                      <div className="sticky top-0 bg-slate-950 pt-3.5 pb-2.5 z-30 shrink-0 flex flex-col">
+                        {/* Search & filters head */}
+                        <div className="mb-4">
+                          <h3 className="font-display italic text-2xl font-extrabold text-white uppercase leading-none tracking-wider mb-1.5">
+                            MESSENGER HỖ TRỢ CHAT
+                          </h3>
+                          <span className="text-[10px] font-mono tracking-widest text-[#D2FF00] uppercase font-bold leading-none block">
+                            TỔNG ĐÀI HỖ TRỢ TRỰC TUYẾN 24/7
+                          </span>
+                        </div>
 
-                      {/* Core support directory search input bar */}
-                      <div className="relative mb-3.5">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 size-4" />
-                        <input
-                          type="text"
-                          value={supportSearchQuery}
-                          onChange={(e) => setSupportSearchQuery(e.target.value)}
-                          placeholder="Tìm nhân viên hỗ trợ hoặc PT..."
-                          className="w-full pl-9 pr-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:border-[#D2FF00] focus:outline-none text-xs text-white placeholder-zinc-550 font-mono"
-                        />
-                      </div>
+                        {/* Core support directory search input bar */}
+                        <div className="relative mb-3.5">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 size-4" />
+                          <input
+                            type="text"
+                            value={supportSearchQuery}
+                            onChange={(e) => setSupportSearchQuery(e.target.value)}
+                            placeholder="Tìm nhân viên hỗ trợ hoặc PT..."
+                            className="w-full pl-9 pr-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl focus:border-[#D2FF00] focus:outline-none text-xs text-white placeholder-zinc-550 font-mono"
+                          />
+                        </div>
 
-                      {/* Filter Chips tags matches image 8 */}
-                      <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
-                        {[
-                          { id: "all", label: "TẤT CẢ" },
-                          { id: "pt", label: "HLV THỂ HÌNH (PT)" },
-                          { id: "support", label: "LỄ TÂN / SUPPORT" },
-                        ].map((chip) => (
+                        {/* Sub-tabs / Switcher buttons bar */}
+                        <div className="flex gap-2 bg-zinc-950/60 p-1 rounded-xl border border-zinc-900/60">
                           <button
-                            key={chip.id}
-                            onClick={() => setSupportCategoryFilter(chip.id as any)}
+                            onClick={() => setSupportActiveSubTab("directory")}
                             type="button"
-                            className={`shrink-0 py-1.5 px-3 font-mono font-black text-[9px] rounded-lg tracking-wider transition duration-150 uppercase cursor-pointer ${
-                              supportCategoryFilter === chip.id
-                                ? "bg-[#D2FF00] text-black font-extrabold shadow-[0_2px_8px_rgba(210,255,0,0.2)]"
-                                : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white"
+                            className={`flex-1 py-1.8 px-2 rounded-lg font-mono text-[9px] font-black tracking-wider transition duration-150 uppercase flex items-center justify-center gap-1.5 cursor-pointer ${
+                              supportActiveSubTab === "directory"
+                                ? "bg-[#D2FF00] text-black font-extrabold shadow-[0_2px_8px_rgba(210,255,0,0.15)]"
+                                : "text-zinc-400 hover:text-white"
                             }`}
                           >
-                            {chip.label}
+                            <User className="size-3" />
+                            <span>DANH BẠ</span>
                           </button>
-                        ))}
-                      </div>
 
-                      {/* DỘI THOẠI ĐANG CHAT (Recent active chats list) */}
-                      <div className="mb-4">
-                        <span className="text-[8px] text-zinc-500 font-mono uppercase tracking-wider block mb-1.5">HỘI THOẠI ĐANG CHAT</span>
-                        <div className="border border-dashed border-zinc-800 rounded-2xl p-4 text-center justify-center py-5 bg-zinc-900/10">
-                          <p className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest leading-normal">
-                            Chưa có cuộc trò chuyện nào trước đó. Chọn HLV hoặc kỹ thuật viên ở mục danh bạ phía dưới để khởi tạo chat ngay!
-                          </p>
+                          <button
+                            onClick={() => setSupportActiveSubTab("incoming")}
+                            type="button"
+                            className={`flex-1 py-1.8 px-2 rounded-lg font-mono text-[9px] font-black tracking-wider transition duration-150 uppercase flex items-center justify-center gap-1.5 cursor-pointer relative ${
+                              supportActiveSubTab === "incoming"
+                                ? "bg-[#D2FF00] text-black font-extrabold shadow-[0_2px_8px_rgba(210,255,0,0.15)]"
+                                : "text-zinc-400 hover:text-white"
+                            }`}
+                          >
+                            <MessageSquare className="size-3" />
+                            <span>TIN NHẮN ĐẾN</span>
+                            {sortedIncomingMessages.length > 0 && (
+                              <span className="bg-rose-500 text-white font-sans text-[7.5px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow-lg shrink-0 leading-none">
+                                {sortedIncomingMessages.length}
+                              </span>
+                            )}
+                          </button>
                         </div>
                       </div>
 
-                      {/* ONLINE CONTACT DIRECTORY CARDS matches images 8 precisely */}
-                      <div className="flex-1 flex flex-col gap-3.5">
-                        <span className="text-[8px] text-slate-500 font-mono uppercase tracking-wider block leading-none">DANH BẠ TRỰC TUYẾN ({SUPPORT_CONTACTS.filter(c => c.isOnline).length})</span>
-                        
-                        {SUPPORT_CONTACTS.filter((contact) => {
-                          const matchesCat =
-                            supportCategoryFilter === "all" || contact.category === supportCategoryFilter;
-                          const matchesQuery =
-                            contact.name.toLowerCase().includes(supportSearchQuery.toLowerCase()) ||
-                            contact.roleLabel.toLowerCase().includes(supportSearchQuery.toLowerCase());
-                          return matchesCat && matchesQuery;
-                        }).map((contact) => (
-                          <div
-                            key={contact.id}
-                            className="bg-zinc-900/60 border border-zinc-800 p-4 rounded-3xl flex flex-col gap-3.5 relative shadow"
-                          >
-                            
-                            {/* Profile core row */}
-                            <div className="flex items-start gap-3">
-                              {/* Avatar circle with online green pulsing indicator */}
-                              <div className="shrink-0 relative">
-                                <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 text-white font-bold text-center flex items-center justify-center font-sans text-base bg-gradient-to-tr from-zinc-850 to-zinc-900">
-                                  {contact.avatarChar}
-                                </div>
-                                {contact.isOnline && (
-                                  <span className="absolute bottom-[-1px] right-[-1px] w-3 h-3 rounded-full bg-green-500 border-[2px] border-zinc-900 shadow-[0_0_8px_rgba(34,197,94,0.7)] animate-pulse" />
-                                )}
-                              </div>
-
-                              <div className="flex-1">
-                                <div className="flex justify-between items-start">
-                                  <span className="bg-zinc-800 text-[#D2FF00] border border-zinc-700/50 text-[8px] font-mono px-1.5 py-0.2 rounded uppercase font-bold">
-                                    {contact.roleLabel}
-                                  </span>
-                                </div>
-                                <h4 className="font-display italic text-lg font-extrabold text-white uppercase leading-tight mt-1">
-                                  {contact.name}
-                                </h4>
-                                <span className="text-[8px] text-zinc-550 font-mono block uppercase">
-                                  {contact.id === "tiep_tan" ? "Lễ tân ca sáng" : contact.id === "huan_luyen" ? "PT Chuyên nghiệp" : "Kỹ thuật"}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* BIO descriptive window */}
-                            <div className="p-3 bg-black/40 border border-zinc-850/60 rounded-2xl text-[10px] text-zinc-300 font-sans leading-relaxed">
-                              {contact.bio}
-                            </div>
-
-                            {/* CALL DIRECT vs TEXT MESSAGE actions row matches image 8 */}
-                            <div className="grid grid-cols-2 gap-3 pt-1">
+                      {/* Sub-tab 1: Directory list view */}
+                      {supportActiveSubTab === "directory" && (
+                        <div className="flex-1 flex flex-col gap-3.5 overflow-y-auto pr-0.5 custom-scrollbar pb-8">
+                          {/* Filter Chips tags matches image 8 */}
+                          <div className="flex gap-2 mb-1.5 overflow-x-auto no-scrollbar pb-1 shrink-0">
+                            {[
+                              { id: "all", label: "TẤT CẢ" },
+                              { id: "pt", label: "HLV THỂ HÌNH (PT)" },
+                              { id: "support", label: "LỄ TÂN / SUPPORT" },
+                            ].map((chip) => (
                               <button
-                                onClick={() => {
-                                  showToast(
-                                    language === "VI"
-                                      ? `Đang thực hiện cuộc gọi viễn thông trực tiếp đến: ${contact.name}`
-                                      : `Initiating direct telecom call to: ${contact.name}`
-                                  );
-                                }}
+                                key={chip.id}
+                                onClick={() => setSupportCategoryFilter(chip.id as any)}
                                 type="button"
-                                className="py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white font-mono font-black text-[9px] tracking-wide border border-zinc-700/50 rounded-xl flex items-center justify-center gap-1.5 transition duration-150 uppercase cursor-pointer"
+                                className={`shrink-0 py-1.5 px-3 font-mono font-black text-[8px] rounded-lg tracking-wider transition duration-150 uppercase cursor-pointer ${
+                                  supportCategoryFilter === chip.id
+                                    ? "bg-[#D2FF00] text-black font-extrabold shadow-[0_2px_8px_rgba(210,255,0,0.2)]"
+                                    : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white"
+                                }`}
                               >
-                                <Phone className="size-3" />
-                                <span>GỌI TRỰC TIẾP</span>
+                                {chip.label}
                               </button>
-
-                              <button
-                                onClick={() => {
-                                  setActiveSupportContact(contact);
-                                  setCurrentScreen("SUPPORT_CHAT");
-                                }}
-                                type="button"
-                                className="py-2.5 bg-[#D2FF00] hover:bg-[#c6ef00] text-black font-mono font-black text-[9px] tracking-wide rounded-xl flex items-center justify-center gap-1.5 transition duration-150 uppercase cursor-pointer shadow-[0_2px_10px_rgba(210,255,0,0.15)]"
-                              >
-                                <MessageSquare className="size-3 text-black" />
-                                <span>NHẮN TIN</span>
-                              </button>
-                            </div>
-
+                            ))}
                           </div>
-                        ))}
-                      </div>
+
+                          {/* DỘI THOẠI ĐANG CHAT (Recent active chats list) */}
+                          <div className="mb-1 shrink-0">
+                            <span className="text-[8px] text-zinc-550 font-mono uppercase tracking-wider block mb-1.5">HỘI THOẠI GẦN ĐÂY</span>
+                            <div className="border border-dashed border-zinc-800 rounded-2xl p-3.5 text-center justify-center py-4 bg-zinc-900/10">
+                              <p className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest leading-normal">
+                                Chưa có cuộc trò chuyện nào trước đó. Chọn HLV hoặc kỹ thuật viên ở mục danh bạ phía dưới để khởi tạo chat ngay!
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* ONLINE CONTACT DIRECTORY CARDS matches images 8 precisely */}
+                          <div className="flex flex-col gap-3.5">
+                            <span className="text-[8px] text-slate-500 font-mono uppercase tracking-wider block leading-none">DANH BẠ TRỰC TUYẾN ({SUPPORT_CONTACTS.filter(c => c.isOnline).length})</span>
+                            
+                            {SUPPORT_CONTACTS.filter((contact) => {
+                              const matchesCat =
+                                supportCategoryFilter === "all" || contact.category === supportCategoryFilter;
+                              const matchesQuery =
+                                contact.name.toLowerCase().includes(supportSearchQuery.toLowerCase()) ||
+                                contact.roleLabel.toLowerCase().includes(supportSearchQuery.toLowerCase());
+                              return matchesCat && matchesQuery;
+                            }).map((contact) => (
+                              <div
+                                key={contact.id}
+                                className="bg-zinc-900/60 border border-zinc-800 p-4 rounded-3xl flex flex-col gap-3.5 relative shadow text-left"
+                              >
+                                {/* Profile core row */}
+                                <div className="flex items-start gap-3">
+                                  {/* Avatar circle with online green pulsing indicator */}
+                                  <div className="shrink-0 relative">
+                                    <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 text-white font-bold text-center flex items-center justify-center font-sans text-base bg-gradient-to-tr from-zinc-850 to-zinc-900">
+                                      {contact.avatarChar}
+                                    </div>
+                                    {contact.isOnline && (
+                                      <span className="absolute bottom-[-1px] right-[-1px] w-3 h-3 rounded-full bg-green-500 border-[2px] border-zinc-900 shadow-[0_0_8px_rgba(34,197,94,0.7)] animate-pulse" />
+                                    )}
+                                  </div>
+
+                                  <div className="flex-1">
+                                    <div className="flex justify-between items-start">
+                                      <span className="bg-zinc-800 text-[#D2FF00] border border-zinc-700/50 text-[8px] font-mono px-1.5 py-0.2 rounded uppercase font-bold">
+                                        {contact.roleLabel}
+                                      </span>
+                                    </div>
+                                    <h4 className="font-display italic text-lg font-extrabold text-white uppercase leading-tight mt-1">
+                                      {contact.name}
+                                    </h4>
+                                    <span className="text-[8px] text-zinc-550 font-mono block uppercase">
+                                      {contact.id === "tiep_tan" ? "Lễ tân ca sáng" : contact.id === "huan_luyen" ? "PT Chuyên nghiệp" : "Kỹ thuật"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* BIO descriptive window */}
+                                <div className="p-3 bg-black/40 border border-zinc-850/60 rounded-2xl text-[10px] text-zinc-300 font-sans leading-relaxed">
+                                  {contact.bio}
+                                </div>
+
+                                {/* CALL DIRECT vs TEXT MESSAGE actions row matches image 8 */}
+                                <div className="grid grid-cols-2 gap-3 pt-1">
+                                  <button
+                                    onClick={() => {
+                                      showToast(
+                                        language === "VI"
+                                          ? `Đang thực hiện cuộc gọi viễn thông trực tiếp đến: ${contact.name}`
+                                          : `Initiating direct telecom call to: ${contact.name}`
+                                      );
+                                    }}
+                                    type="button"
+                                    className="py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white font-mono font-black text-[9px] tracking-wide border border-zinc-700/50 rounded-xl flex items-center justify-center gap-1.5 transition duration-150 uppercase cursor-pointer"
+                                  >
+                                    <Phone className="size-3" />
+                                    <span>GỌI TRỰC TIẾP</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      setActiveSupportContact(contact);
+                                      setCurrentScreen("SUPPORT_CHAT");
+                                    }}
+                                    type="button"
+                                    className="py-2.5 bg-[#D2FF00] hover:bg-[#c6ef00] text-black font-mono font-black text-[9px] tracking-wide rounded-xl flex items-center justify-center gap-1.5 transition duration-150 uppercase cursor-pointer shadow-[0_2px_10px_rgba(210,255,0,0.15)]"
+                                  >
+                                    <MessageSquare className="size-3 text-black" />
+                                    <span>NHẮN TIN</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sub-tab 2: Incoming messages list view */}
+                      {supportActiveSubTab === "incoming" && (
+                        <div className="flex-1 flex flex-col gap-3.5 mt-1 overflow-y-auto pr-0.5 custom-scrollbar pb-8">
+                          <div className="flex items-center justify-between pb-1 shrink-0">
+                            <span className="text-[8.5px] text-zinc-550 font-mono uppercase tracking-wider block">Hộp thư hỗ trợ ({sortedIncomingMessages.length})</span>
+                            <span className="text-[7.5px] text-[#D2FF00] font-mono uppercase tracking-widest font-black">Trực tuyến 24/7</span>
+                          </div>
+
+                          {sortedIncomingMessages.length === 0 ? (
+                            <div className="border border-dashed border-zinc-800 rounded-2xl p-6 text-center py-10 bg-zinc-900/10">
+                              <p className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest leading-relaxed">
+                                Không có tin nhắn nào từ nhân viên hỗ trợ. Hãy gửi tin nhắn trước cho họ ở tab danh bạ!
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-3">
+                              {sortedIncomingMessages.map((msg) => (
+                                <div
+                                  key={msg.id}
+                                  onClick={() => {
+                                    setActiveSupportContact(msg.agent);
+                                    setCurrentScreen("SUPPORT_CHAT");
+                                  }}
+                                  className="bg-zinc-900/35 hover:bg-zinc-900/80 border border-zinc-800/80 hover:border-[#D2FF00]/40 p-3.5 rounded-2xl flex flex-col gap-2.5 transition duration-150 cursor-pointer relative group shadow-sm text-left select-none animate-fade-in"
+                                >
+                                  {/* Top header row */}
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-6 h-6 rounded-full bg-zinc-850 border border-zinc-700/65 text-white font-bold text-center flex items-center justify-center font-sans text-[10px]">
+                                        {msg.agent.avatarChar}
+                                      </div>
+                                      <div>
+                                        <h5 className="font-display italic text-[11px] font-black text-white uppercase tracking-wide leading-none">
+                                          {msg.agent.name}
+                                        </h5>
+                                        <span className="text-[7.5px] text-[#D2FF00] font-mono uppercase block mt-0.5 font-bold">
+                                          {msg.agent.roleLabel}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <span className="text-[7.5px] text-zinc-550 font-mono bg-zinc-950 px-2 py-0.5 rounded border border-zinc-900">
+                                      {msg.timestamp}
+                                    </span>
+                                  </div>
+
+                                  {/* Message brief body */}
+                                  <p className="text-[10.5px] text-zinc-300 font-sans leading-relaxed pl-2.5 italic border-l-2 border-zinc-700 group-hover:border-[#D2FF00]/65 transition-all">
+                                    "{msg.content}"
+                                  </p>
+
+                                  <div className="flex justify-end pt-0.5">
+                                    <div className="text-[8px] font-mono font-black text-[#D2FF00] tracking-wider uppercase flex items-center gap-1 group-hover:translate-x-1 duration-150 transition-all">
+                                      <span>TRẢ LỜI NGAY</span>
+                                      <ChevronRight className="size-3" />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                     </div>
                   )}
 
-                  {currentScreen === "SUPPORT_CHAT_OLD_TO_BE_REPLACED" && (
-                    <div className="hidden">
+                  {currentScreen === "SUPPORT_CHAT" && (
+                    <div className="flex-1 flex flex-col justify-between h-full animate-fade-in relative px-5 pt-3">
                       
                       {/* Top Header Contact details with phone call option */}
                       <div className="flex items-center justify-between mb-3 mt-1 pb-2 border-b border-zinc-800 pr-1 text-left shrink-0">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setCurrentScreen("SUPPORT_LIST")}
-                            className="p-1 text-slate-400 hover:text-white hover:bg-zinc-800 rounded-lg duration-150"
+                            className="p-1 -ml-1 text-slate-400 hover:text-white hover:bg-zinc-900 rounded-lg duration-150 cursor-pointer border-0 bg-transparent"
                           >
                             <ChevronLeft className="size-4" />
                           </button>
@@ -1742,7 +2333,7 @@ export default function App() {
                 </div>
 
                 {/* 3. Bottom persistent tab bars styling index overlays on app screens */}
-                {session.isLoggedIn && (
+                {isLoggedScreen && (
                   <div className="h-[62px] shrink-0 bg-zinc-950 border-t border-zinc-900 grid grid-cols-4 px-2 py-1 gap-1 z-50">
                     {/* TRANG CHỦ TAB MATCHING IMAGE 5 */}
                     <button
@@ -1826,7 +2417,7 @@ export default function App() {
             </div>
             
             {/* FLOATING ACTION BRAND BUTTON (Sparkles glow icon bottom-right) match image 5 */}
-            {session.isLoggedIn && (
+            {isLoggedScreen && (
               <button
                 onClick={() => {
                   setCurrentScreen("CHAT_AI");

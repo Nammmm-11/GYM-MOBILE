@@ -48,3 +48,13 @@ export interface SupportContact {
   category: "pt" | "support";
   isOnline: boolean;
 }
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  time: string;
+  isRead: boolean;
+  type: "welcome" | "auth" | "promo" | "workout" | "billing" | "message";
+}
+
